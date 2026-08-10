@@ -10,6 +10,7 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 # filesystem exists. Keep this in sync with input_modules in
 # packaging/installer/runtime/kait2en-prepare and MODULES in
 # packaging/installer/anaconda-addon/com_kait2en_input/service/constants.py.in.
+# shellcheck disable=SC2034 # consumed by the scripts that source this file
 INPUT_MODULES=(t2bce_dma t2hid hid_t2magicmouse t2bce_core t2bce_vhci)
 
 info() {

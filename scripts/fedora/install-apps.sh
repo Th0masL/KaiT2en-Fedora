@@ -183,6 +183,7 @@ install_react_drm() {
 		fi
 	done
 	if [[ ${#installed_node_packages[@]} -gt 0 ]]; then
+		# shellcheck disable=SC1010 # `do` is a dnf5 subcommand, not the keyword
 		dnf -y do \
 			--action=remove "${installed_node_packages[@]}" \
 			--action=install "${REACT_DRM_FEDORA_PACKAGES[@]}"
