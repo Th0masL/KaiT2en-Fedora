@@ -5,6 +5,14 @@ set -Eeuo pipefail
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
 cd "$repo_root"
 
+# Every `! rg ...` assertion below is satisfied by rg being absent, because the
+# failed lookup is what the negation asks for. A missing ripgrep turns them into
+# no-ops and the suite still reports success, so refuse to run without it.
+if ! command -v rg >/dev/null 2>&1; then
+	printf 'these checks require rg, from the ripgrep package\n' >&2
+	exit 1
+fi
+
 shell_files=(
 	packaging/installer/build-in-container.sh
 	packaging/installer/build-input-kmod.sh
@@ -20,12 +28,16 @@ shell_files=(
 	packaging/installer/runtime/kait2en-live-wifi
 	packaging/installer/runtime/kait2en-prepare
 	scripts/fedora/build-installer.sh
+	scripts/fedora/install-apps.sh
 	scripts/fedora/install-dkms-modules.sh
+	scripts/fedora/lib.sh
+	scripts/fedora/rebuild-initramfs.sh
 	scripts/macos/prepare-fedora-installer.sh
 	tests/installer/edition-catalog.sh
 	tests/installer/install-launcher.sh
 	tests/installer/static-check.sh
 	tests/installer/prepare-install.sh
+	tests/installer/rebuild-initramfs.sh
 	tests/installer/release-bootstrap.sh
 	tests/installer/bt-firmware.sh
 	tests/installer/live-bluetooth.sh
@@ -74,6 +86,52 @@ grep -Fq '"$transition_source" "$target_kernel" "$work/rpm"' \
 grep -Fq 'dracut --force --force-drivers' \
 	packaging/installer/runtime/kait2en-prepare
 ! grep -Fq -- '--add-drivers' packaging/installer/runtime/kait2en-prepare
+
+# The finished system rebuilds its own initramfs on every run and on every
+# kernel. Host-only autodetection has produced images with none of the input
+# modules, so this stage forces them in, and it stages the result instead of
+# writing over an image that still boots the machine.
+grep -Fq 'dracut --force --force-drivers' scripts/fedora/rebuild-initramfs.sh
+grep -Fq 'mv -f "$STAGED" "$INITRAMFS"' scripts/fedora/rebuild-initramfs.sh
+# Staging means the filesystem holds two images at once, which is a real
+# constraint on the 1 GiB /boot some installs end up with.
+grep -Fq 'df -Pk "$BOOT_ROOT"' scripts/fedora/rebuild-initramfs.sh
+
+# /dev/uinput is a kmod static node until the module is loaded, so the udev
+# trigger matches nothing and the input group never gets access. react-drm then
+# fails to open it and systemd restarts it every two seconds forever.
+grep -Fq 'modprobe uinput' scripts/fedora/install-apps.sh
+grep -Fq '/etc/modules-load.d/kait2en-uinput.conf' scripts/fedora/install-apps.sh
+grep -Fq 'stat -c %G /dev/uinput' scripts/fedora/install-apps.sh
+
+# DKMS drops every kernel's build before rebuilding any of them, so a kernel
+# without headers has to be refused up front rather than at the first compile.
+grep -Fq 'require_kernel_headers' scripts/fedora/install-dkms-modules.sh
+grep -Fq 'require_kernel_headers()' scripts/fedora/lib.sh
+
+# The input module list must not drift between the three installation stages.
+grep -Fq 'INPUT_MODULES=(t2bce_dma t2hid hid_t2magicmouse t2bce_core t2bce_vhci)' \
+	scripts/fedora/lib.sh
+grep -Fq 'input_modules=(t2bce_dma t2hid hid_t2magicmouse t2bce_core t2bce_vhci)' \
+	packaging/installer/runtime/kait2en-prepare
+grep -Fq 'for module in t2bce_dma t2hid hid_t2magicmouse t2bce_core t2bce_vhci; do' \
+	packaging/installer/initramfs/20-kait2en-input.sh.in
+python3 - <<'PY'
+import pathlib
+import re
+import sys
+
+expected = ["t2bce_dma", "t2hid", "hid_t2magicmouse", "t2bce_core", "t2bce_vhci"]
+source = pathlib.Path(
+    "packaging/installer/anaconda-addon/com_kait2en_input/service/constants.py.in"
+).read_text()
+match = re.search(r"MODULES = \(([^)]*)\)", source)
+if match is None:
+    sys.exit("constants.py.in has no MODULES tuple")
+found = re.findall(r'"([^"]+)"', match.group(1))
+if found != expected:
+    sys.exit("constants.py.in MODULES drifted from the shared list: %r" % (found,))
+PY
 grep -Fq '"etc", "xdg", "autostart"' \
 	packaging/installer/anaconda-addon/com_kait2en_input/service/installation.py
 ! rg -n 'find_regular_user|home\.lstrip|os\.chown' \
@@ -166,6 +224,7 @@ bash tests/installer/bt-firmware.sh
 bash tests/installer/live-wifi.sh
 bash tests/installer/live-bluetooth.sh
 bash tests/installer/prepare-install.sh
+bash tests/installer/rebuild-initramfs.sh
 bash tests/installer/install-launcher.sh
 bash tests/installer/release-bootstrap.sh
 bash tests/installer/terminal-launcher.sh

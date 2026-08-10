@@ -5,6 +5,13 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
+# The modules that bring up the internal keyboard and trackpad. They have to be
+# in the initramfs, because the LUKS passphrase prompt runs before the root
+# filesystem exists. Keep this in sync with input_modules in
+# packaging/installer/runtime/kait2en-prepare and MODULES in
+# packaging/installer/anaconda-addon/com_kait2en_input/service/constants.py.in.
+INPUT_MODULES=(t2bce_dma t2hid hid_t2magicmouse t2bce_core t2bce_vhci)
+
 info() {
 	printf '[kait2en] %s\n' "$*"
 }
@@ -44,6 +51,16 @@ require_command() {
 
 kernel_release() {
 	printf '%s\n' "${KERNEL_RELEASE:-$(uname -r)}"
+}
+
+require_kernel_headers() {
+	local release
+	release="$(kernel_release)"
+
+	# The trailing component resolves the symlink: Fedora leaves
+	# /lib/modules/<release>/build dangling when kernel-devel is absent.
+	[[ -d "/lib/modules/$release/build/." ]] ||
+		fail "the kernel headers for $release are missing. Install kernel-devel-$release, or boot the kernel you want to build for. Nothing was changed."
 }
 
 require_min_kernel() {
