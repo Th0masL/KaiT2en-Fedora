@@ -5,11 +5,12 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/lib.sh"
 require_root
 require_repo_root
 require_fedora
-require_command dkms make install rm chown mktemp depmod sed tar find grep
+require_command dkms dnf make install rm chown mktemp depmod sed tar find grep
 # Every module is removed for every kernel below before anything is rebuilt, so
-# a kernel that cannot be built for has to stop the script here. Discovering it
-# at the first compile would leave the other kernels with nothing installed.
-require_kernel_headers
+# the headers have to be in place first. Install them when they are missing, and
+# stop here when they cannot be obtained: discovering it at the first compile
+# would leave every kernel with nothing installed.
+ensure_kernel_headers
 
 MODULES=(
 	t2bce_dma

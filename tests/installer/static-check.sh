@@ -96,10 +96,12 @@ grep -Fq 'modprobe uinput' scripts/fedora/install-apps.sh
 grep -Fq '/etc/modules-load.d/kait2en-uinput.conf' scripts/fedora/install-apps.sh
 grep -Fq 'stat -c %G /dev/uinput' scripts/fedora/install-apps.sh
 
-# DKMS drops every kernel's build before rebuilding any of them, so a kernel
-# without headers has to be refused up front rather than at the first compile.
-grep -Fq 'require_kernel_headers' scripts/fedora/install-dkms-modules.sh
-grep -Fq 'require_kernel_headers()' scripts/fedora/lib.sh
+# DKMS drops every kernel's build before rebuilding any of them, so the headers
+# are obtained up front, and a kernel whose headers cannot be installed is
+# refused before anything is removed.
+grep -Fq 'ensure_kernel_headers' scripts/fedora/install-dkms-modules.sh
+grep -Fq 'ensure_kernel_headers()' scripts/fedora/lib.sh
+grep -Fq 'dnf install -y "kernel-devel-$release"' scripts/fedora/lib.sh
 
 # The input module list must not drift between the three installation stages.
 grep -Fq 'INPUT_MODULES=(t2bce_dma t2hid hid_t2magicmouse t2bce_core t2bce_vhci)' \
