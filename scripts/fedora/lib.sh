@@ -56,20 +56,20 @@ kernel_release() {
 
 ensure_kernel_headers() {
 	local release
-	release="$(kernel_release)"
+	# install_module calls dkms without -k, so the build always targets the
+	# running kernel whatever KERNEL_RELEASE says.
+	release="$(uname -r)"
 
-	# The trailing component resolves the symlink: Fedora leaves
-	# /lib/modules/<release>/build dangling when kernel-devel is absent.
-	if [[ -d "/lib/modules/$release/build/." ]]; then
+	if [[ -d "/usr/src/kernels/$release" ]]; then
 		return 0
 	fi
 
 	info "kernel headers for $release are missing, installing kernel-devel-$release"
 	dnf install -y "kernel-devel-$release" ||
-		fail "kernel-devel-$release is not available. Fedora drops the headers for a kernel once it has been superseded, so boot the kernel you want to build for, or install its headers by hand. No DKMS modules were removed."
+		fail "kernel-devel-$release could not be installed. No DKMS modules were removed."
 
-	[[ -d "/lib/modules/$release/build/." ]] ||
-		fail "kernel-devel-$release was installed but /lib/modules/$release/build still does not resolve. No DKMS modules were removed."
+	[[ -d "/usr/src/kernels/$release" ]] ||
+		fail "kernel-devel-$release did not provide /usr/src/kernels/$release. No DKMS modules were removed."
 }
 
 require_min_kernel() {
