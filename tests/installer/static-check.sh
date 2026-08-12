@@ -24,6 +24,7 @@ shell_files=(
 	scripts/fedora/install-dkms-modules.sh
 	scripts/fedora/lib.sh
 	scripts/fedora/rebuild-initramfs.sh
+	scripts/macos/download-fedora-iso.sh
 	scripts/macos/prepare-fedora-installer.sh
 	tests/installer/edition-catalog.sh
 	tests/installer/install-launcher.sh
