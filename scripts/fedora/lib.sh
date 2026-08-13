@@ -54,22 +54,14 @@ kernel_release() {
 	printf '%s\n' "${KERNEL_RELEASE:-$(uname -r)}"
 }
 
-ensure_kernel_headers() {
+require_kernel_headers() {
 	local release
 	# install_module calls dkms without -k, so the build always targets the
 	# running kernel whatever KERNEL_RELEASE says.
 	release="$(uname -r)"
 
-	if [[ -d "/usr/src/kernels/$release" ]]; then
-		return 0
-	fi
-
-	info "kernel headers for $release are missing, installing kernel-devel-$release"
-	dnf install -y "kernel-devel-$release" ||
-		fail "kernel-devel-$release could not be installed. No DKMS modules were removed."
-
-	[[ -d "/usr/src/kernels/$release" ]] ||
-		fail "kernel-devel-$release did not provide /usr/src/kernels/$release. No DKMS modules were removed."
+	[[ -d "/lib/modules/$release/build" ]] ||
+		fail "kernel-devel-$release is missing; run install-dependencies.sh first"
 }
 
 require_min_kernel() {
