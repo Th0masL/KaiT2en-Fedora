@@ -622,8 +622,10 @@ static enum vga_switcheroo_client_id gmux_get_client_id(struct pci_dev *pdev)
 		return VGA_SWITCHEROO_IGD;
 
 	if (apple_gmux_data->use_pwg_power_sequence &&
-	    !apple_gmux_data->discrete_pdev)
+	    apple_gmux_data->discrete_pdev != pdev) {
+		pci_dev_put(apple_gmux_data->discrete_pdev);
 		apple_gmux_data->discrete_pdev = pci_dev_get(pdev);
+	}
 
 	return VGA_SWITCHEROO_DIS;
 }
